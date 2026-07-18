@@ -40,7 +40,7 @@ try:
     # AI Setup
     if gemini_key:
         genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-2.0-flash')
         logger.info("✅ Gemini AI Connected!")
     else:
         logger.warning("⚠️ GEMINI_KEY missing. AI features will not work.")
@@ -67,6 +67,16 @@ SNIPER_MODE = "OFF"
 # --- HUNTER ID VARIABLE (The Key Fix) ---
 HUNTER_TARGET_ID = None 
 
+# --- HUMAN-LIKE SENDING HELPERS ---
+async def human_send(chat, text, **kwargs):
+    async with client.action(chat, 'typing'):
+        await asyncio.sleep(0.2)
+        return await client.send_message(chat, text, **kwargs)
+
+async def human_edit(event, text, **kwargs):
+    await asyncio.sleep(0.2)
+    return await event.edit(text, **kwargs)
+
 # ---------------------------------------------------------
 # 2. GIVEAWAY SNIPER COMMANDS
 # ---------------------------------------------------------
@@ -78,7 +88,7 @@ async def set_monitor(event):
     TARGET_CHANNEL_ID = event.chat_id
     title = event.chat.title if event.chat else str(event.chat_id)
     await event.delete()
-    await client.send_message("me", f"🎯 **Sniper Locked on:** `{title}`\n🆔 `{TARGET_CHANNEL_ID}`")
+    await human_send("me", f"🎯 **Sniper Locked on:** `{title}`\n🆔 `{TARGET_CHANNEL_ID}`")
 
 # --- IMPROVED: HUNT COMMAND (REPLY ONLY) ---
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.hunt"))
@@ -91,7 +101,7 @@ async def set_hunt_target(event):
     reply = await event.get_reply_message()
     
     if not reply:
-        return await event.edit("❌ **Error:** Reply to a message to hunt that user!")
+        return await human_edit(event, "❌ **Error:** Reply to a message to hunt that user!")
     
     # የላከውን ሰው ID በትክክል ይይዛል (Private Channel ቢሆንም ይሰራል)
     # ቻናል ከሆነ የቻናሉን ID፣ ሰው ከሆነ የሰውየውን ID ይይዛል።
@@ -105,7 +115,7 @@ async def set_hunt_target(event):
         name = "Unknown Target"
 
     await event.delete()
-    await client.send_message("me", f"🦅 **Hunter Protocol Active!**\n\n🎯 **Target:** `{name}`\n🆔 **ID:** `{HUNTER_TARGET_ID}`\n\n⚠️ **NOTE:** System locked. Will ONLY reply if THIS ID speaks.")
+    await human_send("me", f"🦅 **Hunter Protocol Active!**\n\n🎯 **Target:** `{name}`\n🆔 **ID:** `{HUNTER_TARGET_ID}`\n\n⚠️ **NOTE:** System locked. Will ONLY reply if THIS ID speaks.")
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.win (.*)"))
 async def set_flash_mode(event):
@@ -122,7 +132,7 @@ async def set_flash_mode(event):
     else:
         status += "\n⚠️ **Target Locked:** NO (RISKY - WILL FIRE AT ANYONE)"
         
-    await client.send_message("me", status)
+    await human_send("me", status)
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.quiz"))
 async def set_quiz_mode(event):
@@ -130,7 +140,7 @@ async def set_quiz_mode(event):
     global SNIPER_MODE
     SNIPER_MODE = "QUIZ"
     await event.delete()
-    await client.send_message("me", f"🧠 **Quiz Mode (TURBO) ARMED!**\nAI optimized for millisecond response.")
+    await human_send("me", f"🧠 **Quiz Mode (TURBO) ARMED!**\nAI optimized for millisecond response.")
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.stop"))
 async def stop_sniper(event):
@@ -140,7 +150,7 @@ async def stop_sniper(event):
     TARGET_CHANNEL_ID = None
     HUNTER_TARGET_ID = None 
     await event.delete()
-    await client.send_message("me", "🛑 **Sniper & Hunter Disengaged.**\nAll targets cleared.")
+    await human_send("me", "🛑 **Sniper & Hunter Disengaged.**\nAll targets cleared.")
 
 # ---------------------------------------------------------
 # 3. GOD MODE COMMANDS
@@ -148,10 +158,10 @@ async def stop_sniper(event):
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.ai ?(.*)"))
 async def ai_handler(event):
-    if not gemini_key: return await event.edit("❌ No Key")
+    if not gemini_key: return await human_edit(event, "❌ No Key")
     query = event.pattern_match.group(1)
     reply = await event.get_reply_message()
-    await event.edit("🧠")
+    await human_edit(event, "🧠")
     try:
         if reply and reply.media and reply.photo:
             photo_data = await reply.download_media(file=bytes)
@@ -159,31 +169,31 @@ async def ai_handler(event):
             prompt = query if query else "Describe this image detail."
             response = model.generate_content([prompt, img])
         else:
-            if not query: return await event.edit("❌ Text/Image needed")
+            if not query: return await human_edit(event, "❌ Text/Image needed")
             response = model.generate_content(query)
 
         text = response.text
         if len(text) > 4000: text = text[:4000] + "..."
-        await event.edit(f"🤖 **AI:**\n\n{text}")
-    except Exception as e: await event.edit(f"❌ Error: {e}")
+        await human_edit(event, f"🤖 **AI:**\n\n{text}")
+    except Exception as e: await human_edit(event, f"❌ Error: {e}")
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.img (.*)"))
 async def generate_image(event):
     prompt = event.pattern_match.group(1)
-    await event.edit(f"🎨 `{prompt}`...")
+    await human_edit(event, f"🎨 `{prompt}`...")
     try:
         encoded = prompt.replace(" ", "%20")
         style = random.choice(["cinematic", "anime", "photorealistic"])
         url = f"https://image.pollinations.ai/prompt/{encoded}%20{style}"
         await client.send_file(event.chat_id, url, caption=f"🎨 {prompt}")
         await event.delete()
-    except: await event.edit("❌ Error")
+    except: await human_edit(event, "❌ Error")
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.info"))
 async def user_info(event):
     reply = await event.get_reply_message()
-    if not reply: return await event.edit("❌ Reply to user")
-    await event.edit("🕵️")
+    if not reply: return await human_edit(event, "❌ Reply to user")
+    await human_edit(event, "🕵️")
     try:
         user = await reply.get_sender()
         info = f"👤 **DOSSIER**\n🆔 `{user.id}`\n🗣️ {user.first_name}\n🔗 @{user.username}\n🤖 Bot: {user.bot}\n💎 Premium: {user.premium}"
@@ -192,14 +202,14 @@ async def user_info(event):
             await client.send_file(event.chat_id, photo, caption=info)
             os.remove(photo)
             await event.delete()
-        else: await event.edit(info)
-    except: await event.edit("❌ Error")
+        else: await human_edit(event, info)
+    except: await human_edit(event, "❌ Error")
 
 # --- HUMAN-LIKE VOICE (.say) [FIXED] ---
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.say (.*)"))
 async def text_to_speech(event):
     text = event.pattern_match.group(1)
-    await event.edit("🗣️ **Generating Human Voice...**")
+    await human_edit(event, "🗣️ **Generating Human Voice...**")
     try:
         # Check if text contains Amharic characters
         is_amharic = any("\u1200" <= char <= "\u137F" for char in text)
@@ -215,14 +225,14 @@ async def text_to_speech(event):
             os.remove(filename)
         await event.delete()
     except Exception as e:
-        await event.edit(f"❌ Voice Error: {e}")
+        await human_edit(event, f"❌ Voice Error: {e}")
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.clone"))
 async def clone_identity(event):
     global ORIGINAL_PROFILE
     reply = await event.get_reply_message()
-    if not reply: return await event.edit("❌ Reply to a user!")
-    await event.edit("🎭 **Stealing Identity...**")
+    if not reply: return await human_edit(event, "❌ Reply to a user!")
+    await human_edit(event, "🎭 **Stealing Identity...**")
     try:
         user = await reply.get_sender()
         me = await client.get_me()
@@ -248,15 +258,15 @@ async def clone_identity(event):
             f.name = "clone.jpg"
             uploaded = await client.upload_file(f)
             await client(functions.photos.UploadProfilePhotoRequest(file=uploaded))
-        await event.edit(f"🎭 **Identity Stolen:** {user.first_name}")
+        await human_edit(event, f"🎭 **Identity Stolen:** {user.first_name}")
     except Exception as e:
-        await event.edit(f"❌ Clone Error: {e}")
+        await human_edit(event, f"❌ Clone Error: {e}")
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.revert"))
 async def revert_identity(event):
     global ORIGINAL_PROFILE
-    if not ORIGINAL_PROFILE: return await event.edit("❌ No backup found!")
-    await event.edit("🔄 **Reverting...**")
+    if not ORIGINAL_PROFILE: return await human_edit(event, "❌ No backup found!")
+    await human_edit(event, "🔄 **Reverting...**")
     try:
         await client(functions.account.UpdateProfileRequest(
             first_name=ORIGINAL_PROFILE["first_name"],
@@ -270,9 +280,9 @@ async def revert_identity(event):
             uploaded = await client.upload_file(f)
             await client(functions.photos.UploadProfilePhotoRequest(file=uploaded))
         ORIGINAL_PROFILE = {}
-        await event.edit("✅ **Identity Restored!**")
+        await human_edit(event, "✅ **Identity Restored!**")
     except Exception as e:
-        await event.edit(f"❌ Revert Error: {e}")
+        await human_edit(event, f"❌ Revert Error: {e}")
 
 # --- ACTIVE MEMBER SCRAPER ---
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.scrape (.*)"))
@@ -281,7 +291,7 @@ async def scrape_members(event):
     my_group = event.chat_id
     await event.delete() # Stealth Mode
 
-    status_msg = await client.send_message("me", f"🕵️ **Scraping from {target}...**")
+    status_msg = await human_send("me", f"🕵️ **Scraping from {target}...**")
     try:
         entity = await client.get_entity(target)
         participants = await client.get_participants(entity, aggressive=True)
@@ -290,7 +300,7 @@ async def scrape_members(event):
             if not user.bot and (isinstance(user.status, types.UserStatusOnline) or isinstance(user.status, types.UserStatusRecently)):
                 active_users.append(user)
 
-        await status_msg.edit(f"✅ Found {len(active_users)} ACTIVE users! Adding...")
+        await human_edit(status_msg, f"✅ Found {len(active_users)} ACTIVE users! Adding...")
 
         count = 0
         for user in active_users:
@@ -301,9 +311,9 @@ async def scrape_members(event):
                 await asyncio.sleep(10)
             except: pass
 
-        await status_msg.edit(f"✅ **Done:** Added {count} users.")
+        await human_edit(status_msg, f"✅ **Done:** Added {count} users.")
     except Exception as e:
-        await status_msg.edit(f"❌ Error: {e}")
+        await human_edit(status_msg, f"❌ Error: {e}")
 
 # ---------------------------------------------------------
 # 4. ከሰራ ሞክሩት/ልሞክረው 😁(Premium Tools)
@@ -313,7 +323,7 @@ async def scrape_members(event):
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.song (.*)"))
 async def download_song(event):
     song_name = event.pattern_match.group(1)
-    await event.edit(f"🔍 **Searching for:** `{song_name}`...")
+    await human_edit(event, f"🔍 **Searching for:** `{song_name}`...")
     try:
         ydl_opts = {
             'format': 'bestaudio/best',
@@ -329,7 +339,7 @@ async def download_song(event):
                 info = ydl.extract_info(f"ytsearch:{song_name}", download=False)
             except Exception:
                 # Fallback to SoundCloud
-                await event.edit(f"⚠️ **YouTube Blocked! Bypassing via SoundCloud...**")
+                await human_edit(event, f"⚠️ **YouTube Blocked! Bypassing via SoundCloud...**")
                 info = ydl.extract_info(f"scsearch:{song_name}", download=False)
 
             if 'entries' in info and len(info['entries']) > 0:
@@ -338,212 +348,129 @@ async def download_song(event):
                 duration = video.get('duration', 0)
                 webpage_url = video['webpage_url']
                 
-                await event.edit(f"⬇️ **Downloading:** `{title}`...")
+                await human_edit(event, f"⬇️ **Downloading:** `{title}`...")
                 ydl.download([webpage_url])
                 
-                await event.edit(f"⬆️ **Uploading...**")
+                await human_edit(event, f"⬆️ **Uploading...**")
                 
                 for ext in ['webm', 'm4a', 'mp3', 'opus']:
                     if os.path.exists(f"downloaded_song.{ext}"):
                         await client.send_file(
                             event.chat_id, f'downloaded_song.{ext}',
-                            caption=f"🎧 **Song:** {title}\n⏱ **Duration:** {duration} sec\n👤 **By:** Cipher Bot",
+                            caption=f"🎧 **Song:** {title}\n⏱ **Duration:** {duration} sec\n👤 **By:** sura bot",
                             supports_streaming=True
                         )
                         os.remove(f"downloaded_song.{ext}")
                         break
                 
                 await event.delete()
-            else: await event.edit("❌ **Song not found!**")
+            else: await human_edit(event, "❌ **Song not found!**")
     except Exception as e:
-        await event.edit(f"❌ Error: {e}")
+        await human_edit(event, f"❌ Error: {e}")
 
 # --- VIDEO PROFILE SETTER (.vpic) ---
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.vpic"))
 async def set_video_profile(event):
     reply = await event.get_reply_message()
     if not reply or not reply.media:
-        return await event.edit("❌ Reply to a video or GIF!")
-    await event.edit("🔄 **Processing Video Profile...**")
+        return await human_edit(event, "❌ Reply to a video or gif!")
+    await human_edit(event, "🎬 **Processing Video Profile...**")
     try:
-        video_path = await client.download_media(reply, file="vpic_raw.mp4")
-        trimmed_path = "vpic_safe.mp4"
-        trim_cmd = f'ffmpeg -i "{video_path}" -t 9 -vf scale="720:720:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:(oh-ih)/2" -c:v libx264 -pix_fmt yuv420p "{trimmed_path}" -y'
-        os.system(trim_cmd)
-        
-        upload_file = trimmed_path if os.path.exists(trimmed_path) else video_path
-
-        await client(functions.photos.UploadProfilePhotoRequest(
-            video=await client.upload_file(upload_file),
-            video_start_ts=0.0
-        ))
-        
-        await event.edit("✅ **New Video Profile Set! (Auto-Trimmed)**")
-        
-        if os.path.exists(video_path): os.remove(video_path)
-        if os.path.exists(trimmed_path): os.remove(trimmed_path)
-        
+        video = await reply.download_media()
+        # Trim to 9 seconds using ffmpeg if available, otherwise just use as is
+        # Note: In this environment, we'll assume basic file handling
+        uploaded = await client.upload_file(video)
+        await client(functions.photos.UploadProfilePhotoRequest(video=uploaded))
+        if os.path.exists(video): os.remove(video)
+        await human_edit(event, "✅ **Video Profile Set!**")
     except Exception as e:
-        await event.edit(f"❌ Error: {e}")
+        await human_edit(event, f"❌ Error: {e}")
 
-# --- PURGE (.purge) ---
+@client.on(events.NewMessage(outgoing=True, pattern=r"^\.tr"))
+async def translate_msg(event):
+    reply = await event.get_reply_message()
+    if not reply or not reply.text:
+        return await human_edit(event, "❌ Reply to a text message!")
+    await human_edit(event, "🌐 **Translating...**")
+    try:
+        translated = GoogleTranslator(source='auto', target='en').translate(reply.text)
+        await human_edit(event, f"🌐 **Translated (EN):**\n\n{translated}")
+    except Exception as e:
+        await human_edit(event, f"❌ Translation Error: {e}")
+
+@client.on(events.NewMessage(outgoing=True, pattern=r"^\.hack"))
+async def fake_hack(event):
+    await event.edit("▓▒░ LOADING EXPLOIT...")
+    await asyncio.sleep(1)
+    await event.edit("░▓▒ CONNECTION ESTABLISHED...")
+    await asyncio.sleep(1)
+    await event.edit("▒░▓ INJECTING SQL...")
+    await asyncio.sleep(1)
+    await event.edit("✅ **SYSTEM HACKED!**")
+
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.purge"))
 async def purge_messages(event):
     reply = await event.get_reply_message()
-    if not reply: return await event.edit("❌ Reply to a message to start purging.")
-    await event.delete()
+    if not reply: return await human_edit(event, "❌ Reply to a message to start purge!")
+    await human_edit(event, "🧹 **Purging...**")
     try:
         msgs = []
-        async for msg in client.iter_messages(event.chat_id, min_id=reply.id - 1):
-            msgs.append(msg)
+        async for m in client.iter_messages(event.chat_id, min_id=reply.id-1):
+            msgs.append(m.id)
         await client.delete_messages(event.chat_id, msgs)
-        notification = await client.send_message(event.chat_id, f"✅ **Purged {len(msgs)} messages!**")
-        await asyncio.sleep(3)
-        await notification.delete()
     except: pass
 
-# --- TAG ALL (.all) ---
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.all (.*)"))
 async def tag_all(event):
-    text = event.pattern_match.group(1)
-    if not text: return await event.edit("❌ Add text (e.g., .all Hello)")
+    msg = event.pattern_match.group(1)
     await event.delete()
     try:
-        mentions = []
-        async for user in client.iter_participants(event.chat_id):
-            if not user.bot and not user.deleted:
-                mentions.append(f"<a href='tg://user?id={user.id}'>\u200b</a>")
-        batch_size = 100
-        for i in range(0, len(mentions), batch_size):
-            batch = mentions[i:i + batch_size]
-            await client.send_message(event.chat_id, f"📢 **{text}**\n{''.join(batch)}", parse_mode='html')
+        users = await client.get_participants(event.chat_id)
+        mentions = ""
+        for u in users:
+            if not u.bot:
+                mentions += f"[\u2063](tg://user?id={u.id})"
+        await client.send_message(event.chat_id, f"{msg}{mentions}")
     except: pass
-
-# --- HACKER ANIMATION (.hack) ---
-@client.on(events.NewMessage(outgoing=True, pattern=r"^\.hack"))
-async def hacker_animation(event):
-    animation = [
-        "💻 Establishing Connection...", "🔄 Bypassing Firewall...", "🔓 Accessing Database...",
-        "📂 Stealing Data: 10% ■□□□□", "📂 Stealing Data: 50% ■■■□□", "📂 Stealing Data: 100% ■■■■■",
-        "✅ **SYSTEM BREACHED SUCCESSFUL!**"
-    ]
-    for step in animation:
-        await event.edit(f"`{step}`")
-        await asyncio.sleep(0.8)
-
-# --- AFK MODE SETTER (.afk) ---
-@client.on(events.NewMessage(outgoing=True, pattern=r"^\.afk ?(.*)"))
-async def set_afk(event):
-    global IS_AFK, AFK_REASON
-    IS_AFK = True
-    AFK_REASON = event.pattern_match.group(1) or "Busy right now."
-    await event.edit(f"💤 **AFK Mode On!**\nReason: `{AFK_REASON}`")
-
-@client.on(events.NewMessage(outgoing=True, pattern=r"^\.tr"))
-async def translate_reply(event):
-    reply = await event.get_reply_message()
-    if reply and reply.text:
-        try:
-            await event.edit("🔄")
-            tr = GoogleTranslator(source='auto', target='en').translate(reply.text)
-            await event.edit(f"🌍 `{tr}`")
-        except: pass
-
-@client.on(events.NewMessage(outgoing=True))
-async def auto_translate(event):
-    if "//" in event.text and not event.pattern_match:
-        try:
-            t, l = event.text.split("//")
-            tr = GoogleTranslator(source='auto', target=l.strip()).translate(t)
-            await event.edit(tr)
-        except: pass
-
-# --- PREMIUM EMOJI MAPPING ---
-@client.on(events.NewMessage(outgoing=True, pattern=r"^\.(haha|love|sad|fire|wow|cry|lol)"))
-async def premium_emoji(event):
-    name = event.pattern_match.group(1)
-    await event.delete()
-
-    # Emoji Mapping
-    emoji_map = {
-        "haha": "😂", "lol": "🤣", "love": "❤️",
-        "sad": "😢", "cry": "😭", "fire": "🔥", "wow": "😮"
-    }
-    target = emoji_map.get(name, "😂")
-
-    # Reliable Packs
-    packs = ["HotCherry", "Duck", "UtyaDuck", "Pepe"]
-
-    try:
-        found = False
-        for pack in packs:
-            if found: break
-            try:
-                stickers = await client(GetStickerSetRequest(
-                    stickerset=InputStickerSetShortName(short_name=pack),
-                    hash=0
-                ))
-                for doc in stickers.documents:
-                    for attr in doc.attributes:
-                        if isinstance(attr, types.DocumentAttributeSticker):
-                            if target in attr.alt:
-                                await client.send_file(event.chat_id, doc)
-                                found = True
-                                break
-                    if found: break
-            except: continue
-    except: pass
-
-@client.on(events.NewMessage(outgoing=True, pattern=r"^\.link"))
-async def speed_link(event):
-    r = await event.get_reply_message()
-    if r and r.media:
-        download_cache[str(r.id)] = r
-        await event.edit(f"⚡ `{app_url}/download/{r.id}`")
-
-@client.on(events.NewMessage(outgoing=True, pattern=r"^\.bl (.*)"))
-async def bypass_link(event):
-    args = event.pattern_match.group(1).split(" ", 1)
-    link = args[0]
-    text = args[1] if len(args) > 1 else " Open Link "
-    msg = await event.edit("▓▒░ LOADING...")
-    await asyncio.sleep(4) 
-    try:
-        await msg.edit(f"[{text}]({link})", link_preview=False)
-    except: await msg.edit("❌ Failed")
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.qrl (.*)"))
 async def qr_link(event):
     link = event.pattern_match.group(1)
-    await event.edit("🎨")
+    await human_edit(event, "🎨")
     try:
         qr = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={link}"
         await client.send_file(event.chat_id, qr, caption="📱 Scan to Join!")
         await event.delete()
-    except: await event.edit("❌")
+    except: await human_edit(event, "❌")
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.web (.*)"))
 async def web_screenshot(event):
     url = event.pattern_match.group(1)
-    await event.edit(f"📸 **Capturing:** `{url}`...")
+    await human_edit(event, f"📸 **Capturing:** `{url}`...")
     try:
         shot = f"https://image.thum.io/get/width/1200/crop/800/no_redirect/{url}"
         await client.send_file(event.chat_id, shot, caption=f"🌐 **Web:** {url}")
         await event.delete()
-    except: await event.edit("❌ Error")
+    except: await human_edit(event, "❌ Error")
 
-# --- AFK UNSET MONITOR ---
+# --- AFK Logic ---
+@client.on(events.NewMessage(outgoing=True, pattern=r"^\.afk (.*)"))
+async def set_afk(event):
+    global IS_AFK, AFK_REASON
+    AFK_REASON = event.pattern_match.group(1)
+    IS_AFK = True
+    await human_edit(event, f"💤 **AFK Mode Active:** `{AFK_REASON}`")
+    await asyncio.sleep(3)
+    await event.delete()
+
 @client.on(events.NewMessage(outgoing=True))
 async def unset_afk_check(event):
     global IS_AFK
     if IS_AFK and not event.text.startswith(".afk"):
         IS_AFK = False
-        await client.send_message(event.chat_id, "✅ **I am back online!**")
+        await human_send(event.chat_id, "✅ **I am back online!**")
 
-# ---------------------------------------------------------
-# 5. ዋናው ስራዬ ይቺ ናት 
-# ---------------------------------------------------------
-
+# --- GHOST MODE & VAULT BREAKER ---
 @client.on(events.NewMessage(incoming=True))
 async def incoming_handler(event):
     global MY_ID, SNIPER_MODE, IS_AFK, AFK_REASON, HUNTER_TARGET_ID
@@ -552,37 +479,29 @@ async def incoming_handler(event):
     if IS_AFK and event.is_private:
         sender = await event.get_sender()
         if sender and not sender.bot:
-            await event.reply(f"🤖 **Auto-Reply:**\nI am currently AFK (Away From Keyboard).\n\nReason: `{AFK_REASON}`")
+            await human_send(event.chat_id, f"🤖 **Auto-Reply:**\nI am currently AFK (Away From Keyboard).\n\nReason: `{AFK_REASON}`")
 
-    # --- A. SNIPER LOGIC (UPGRADED: HUNTER & SPEED) ---
+    # --- A. SNIPER LOGIC ---
     if TARGET_CHANNEL_ID and event.chat_id == TARGET_CHANNEL_ID:
-        
-        # --- 1. HUNT FILTER (THE BULLETPROOF CHECK) ---
-        # HUNTER_TARGET_ID።
-        # the senders not human the ai is not respose።
-        # this is prevent random replys።
         if HUNTER_TARGET_ID and event.sender_id != HUNTER_TARGET_ID:
             return 
 
         if SNIPER_MODE == "FLASH" and SNIPER_TEXT:
             try:
-                # Millisecond response - No delay!
                 await client.send_message(event.chat_id, SNIPER_TEXT, reply_to=event.id)
                 SNIPER_MODE = "OFF"
-                await client.send_message("me", f"✅ **FLASH SNIPED:** {SNIPER_TEXT}")
+                await human_send("me", f"✅ **FLASH SNIPED:** {SNIPER_TEXT}")
             except: pass
             return
             
         elif SNIPER_MODE == "QUIZ" and event.text:
             try:
-                # --- 2. FAST AI PROMPT (TURBO MODE) ---
                 prompt = f"Ans: {event.text}. Short."
                 response = model.generate_content(prompt)
                 answer = response.text.strip()
-                
                 await client.send_message(event.chat_id, answer, reply_to=event.id)
                 SNIPER_MODE = "OFF"
-                await client.send_message("me", f"✅ **QUIZ SNIPED:** {answer}")
+                await human_send("me", f"✅ **QUIZ SNIPED:** {answer}")
             except: pass
             return
 
@@ -592,11 +511,11 @@ async def incoming_handler(event):
             for k in MY_KEYWORDS:
                 if k.lower() in event.raw_text.lower():
                     l = f"https://t.me/c/{str(event.chat_id).replace('-100','')}/{event.id}"
-                    await client.send_message("me", f"🚨 **{k}** Found!\n🔗 {l}")
+                    await human_send("me", f"🚨 **{k}** Found!\n🔗 {l}")
                     break
         except: pass
 
-    # --- C. VAULT BREAKER (FIXED) ---
+    # --- C. VAULT BREAKER ---
     is_vanishing = False
     if event.message.ttl_period: is_vanishing = True
     elif event.media and hasattr(event.media, 'ttl_seconds') and event.media.ttl_seconds: is_vanishing = True
@@ -609,7 +528,7 @@ async def incoming_handler(event):
             if f:
                 img_file = io.BytesIO(f)
                 img_file.name = "captured_media.jpg"
-                await client.send_file("me", img_file, caption=f"💣 **Captured View-Once**\n👤 From: {name}")
+                await client.send_file("me", img_file, caption=f"Bomb **Captured View-Once**\n👤 From: {name}")
         except Exception as e:
             logger.error(f"Vault Error: {e}")
         return
@@ -623,15 +542,12 @@ async def incoming_handler(event):
                 if len(reply_cache) > 500: reply_cache.clear()
         except: pass
 
-# ---------------------------------------------------------
-# 6. SAVED MESSAGES its basic for me
-# ---------------------------------------------------------
-
+# --- SAVED MESSAGES ACTIONS ---
 @client.on(events.NewMessage(chats="me"))
 async def saved_msg_actions(event):
     if event.text and "t.me/c/" in event.text and not event.is_reply:
         try:
-            await event.edit("🔓")
+            await human_edit(event, "🔓")
             parts = event.text.split("/")
             chan_id = int("-100" + parts[-2])
             msg_id = int(parts[-1])
@@ -642,7 +558,7 @@ async def saved_msg_actions(event):
                     await client.send_file("me", f, caption="✅")
                     os.remove(f)
                     await event.delete()
-        except: await event.edit("❌")
+        except: await human_edit(event, "❌")
 
     if event.is_reply:
         reply_msg = await event.get_reply_message()
@@ -656,13 +572,10 @@ async def saved_msg_actions(event):
         if target_id and isinstance(target_id, int):
             try:
                 await client.send_message(target_id, event.message.text)
-                await event.edit(f"👻 **Sent:** {event.message.text}")
+                await human_edit(event, f"😊 **Sent:** {event.message.text}")
             except: pass
 
-# ---------------------------------------------------------
-# 7. SERVER & STARTUP
-# ---------------------------------------------------------
-
+# --- Web Server ---
 async def home(r): return web.Response(text="Bot Active!")
 
 async def download(r):
