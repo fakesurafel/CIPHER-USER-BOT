@@ -67,6 +67,9 @@ SNIPER_MODE = "OFF"
 # --- HUNTER ID VARIABLE (The Key Fix) ---
 HUNTER_TARGET_ID = None 
 
+# --- AI AUTO-CHAT VARIABLES ---
+AUTO_CHAT_CHATS = set()
+
 # --- HUMAN-LIKE SENDING HELPERS ---
 async def human_send(chat, text, **kwargs):
     async with client.action(chat, 'typing'):
@@ -453,6 +456,20 @@ async def web_screenshot(event):
         await event.delete()
     except: await human_edit(event, "❌ Error")
 
+# --- AI AUTO-CHAT COMMANDS ---
+@client.on(events.NewMessage(outgoing=True, pattern=r"^\.autochat"))
+async def toggle_autochat(event):
+    global AUTO_CHAT_CHATS
+    chat_id = event.chat_id
+    if chat_id in AUTO_CHAT_CHATS:
+        AUTO_CHAT_CHATS.remove(chat_id)
+        await human_edit(event, "🤖 **AI Auto-Chat:** `DISABLED` for this chat.")
+    else:
+        AUTO_CHAT_CHATS.add(chat_id)
+        await human_edit(event, "🤖 **AI Auto-Chat:** `ENABLED` for this chat.\nI will now analyze and reply automatically.")
+    await asyncio.sleep(3)
+    await event.delete()
+
 # --- AFK Logic ---
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.afk (.*)"))
 async def set_afk(event):
@@ -473,7 +490,28 @@ async def unset_afk_check(event):
 # --- GHOST MODE & VAULT BREAKER ---
 @client.on(events.NewMessage(incoming=True))
 async def incoming_handler(event):
-    global MY_ID, SNIPER_MODE, IS_AFK, AFK_REASON, HUNTER_TARGET_ID
+    global MY_ID, SNIPER_MODE, IS_AFK, AFK_REASON, HUNTER_TARGET_ID, AUTO_CHAT_CHATS
+
+    # --- AI AUTO-CHAT LOGIC ---
+    if event.chat_id in AUTO_CHAT_CHATS and not event.out and not event.is_channel:
+        try:
+            # Get last 10 messages for context
+            messages = await client.get_messages(event.chat_id, limit=10)
+            context = ""
+            for m in reversed(messages):
+                sender = "Me" if m.out else "Them"
+                if m.text:
+                    context += f"{sender}: {m.text}\n"
+            
+            prompt = f"You are a helpful and friendly human assistant. Continue this conversation naturally. If the user speaks Amharic, reply in Amharic. If they speak English, reply in English. Keep it short and human-like.\n\nCONVERSATION HISTORY:\n{context}\nReply to the last message."
+            
+            async with client.action(event.chat_id, 'typing'):
+                response = model.generate_content(prompt)
+                reply_text = response.text.strip()
+                await asyncio.sleep(random.uniform(1, 3)) # More human-like delay
+                await client.send_message(event.chat_id, reply_text)
+        except Exception as e:
+            logger.error(f"Auto-Chat Error: {e}")
 
     # --- AFK AUTO REPLY ---
     if IS_AFK and event.is_private:
