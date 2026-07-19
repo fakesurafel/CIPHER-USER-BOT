@@ -501,15 +501,15 @@ async def incoming_handler(event):
     if event.chat_id in AUTO_CHAT_CHATS and not event.out:
         logger.info(f"🤖 Auto-Chat Triggered in chat {event.chat_id}")
         try:
-            # Get last 10 messages for context
-            messages = await client.get_messages(event.chat_id, limit=10)
+            # Get last 20 messages for deep context
+            messages = await client.get_messages(event.chat_id, limit=20)
             context = ""
             for m in reversed(messages):
                 sender = "Me" if m.out else "Them"
                 if m.text:
                     context += f"{sender}: {m.text}\n"
             
-            prompt = f"You are a close, casual, and super friendly friend. Talk naturally like a real person, NOT a robot or assistant. Use slang and informal language. NO formal talk. If they speak Amharic, reply in casual Amharic (use words like 'ሰላም ነው', 'እንዴት ነህ', 'አሪፍ ነው'). If they speak English, be chill and friendly. Keep it short and very human-like.\n\nCONVERSATION HISTORY:\n{context}\nReply to the last message naturally."
+            prompt = f"You are ME. Analyze the CONVERSATION HISTORY below to understand my 'vibe', my slang, my tone, and how I talk to this person. Your goal is to reply exactly like I would. \n\nRULES:\n1. Match my energy and style perfectly.\n2. Use the same language (Amharic or English) as the last few messages.\n3. Keep it short, casual, and friendly. \n4. NO formal or robotic language.\n\nCONVERSATION HISTORY:\n{context}\nReply to the last message as ME."
             
             async with client.action(event.chat_id, 'typing'):
                 response = model.generate_content(prompt)
