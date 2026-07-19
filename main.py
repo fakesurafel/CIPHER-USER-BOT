@@ -386,8 +386,6 @@ async def set_video_profile(event):
     await human_edit(event, "🎬 **Processing Video Profile...**")
     try:
         video = await reply.download_media()
-        # Trim to 9 seconds using ffmpeg if available, otherwise just use as is
-        # Note: In this environment, we'll assume basic file handling
         uploaded = await client.upload_file(video)
         await client(functions.photos.UploadProfilePhotoRequest(video=uploaded))
         if os.path.exists(video): os.remove(video)
@@ -493,13 +491,15 @@ async def unset_afk_check(event):
         IS_AFK = False
         await human_send(event.chat_id, "✅ **I am back online!**")
 
-# --- GHOST MODE & VAULT BREAKER ---
+# --- GLOBAL HANDLER FOR INCOMING MESSAGES ---
 @client.on(events.NewMessage(incoming=True))
 async def incoming_handler(event):
     global MY_ID, SNIPER_MODE, IS_AFK, AFK_REASON, HUNTER_TARGET_ID, AUTO_CHAT_CHATS
 
     # --- AI AUTO-CHAT LOGIC ---
-    if event.chat_id in AUTO_CHAT_CHATS and not event.out and not event.is_channel:
+    # Trigger ONLY if chat_id is in AUTO_CHAT_CHATS AND it's NOT a message from ME
+    if event.chat_id in AUTO_CHAT_CHATS and not event.out:
+        logger.info(f"🤖 Auto-Chat Triggered in chat {event.chat_id}")
         try:
             # Get last 10 messages for context
             messages = await client.get_messages(event.chat_id, limit=10)
@@ -516,6 +516,7 @@ async def incoming_handler(event):
                 reply_text = response.text.strip()
                 await asyncio.sleep(random.uniform(1, 3)) # More human-like delay
                 await client.send_message(event.chat_id, reply_text)
+                logger.info(f"🤖 Auto-Chat Sent: {reply_text}")
         except Exception as e:
             logger.error(f"Auto-Chat Error: {e}")
 
