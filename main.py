@@ -53,7 +53,7 @@ except Exception as e:
 reply_cache = {}
 download_cache = {}
 MY_ID = None  
-MY_KEYWORDS = ["cipher", "CIPHER", "first comment", "surafel", "ሱራፌል"] 
+MY_KEYWORDS = ["giveaway", "GIVEAWAY", "first comment", "surafel", "ሱራፌል"] 
 # ለ Identity Thief ማስታወሻ
 ORIGINAL_PROFILE = {}
 # --- AFK VARIABLES ---
