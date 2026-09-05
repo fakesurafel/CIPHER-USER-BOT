@@ -12,9 +12,12 @@ Commands are recognized when sent from your own account and begin with a period 
 
 | Command | Usage | Description |
 |---|---|---|
+| `.help` | `.help` | Shows the current command list, usage, and descriptions directly in Telegram. |
 | `.info` | Reply to a user's message, then send `.info` | Shows the user's ID, name, username, bot status, Premium status, and profile photo when available. |
 | `.hack` | `.hack` | Displays a fictional terminal-style animation. It does not perform hacking or security actions. |
 | `.autochat` | `.autochat` inside a chat | Toggles Gemini-powered automatic replies for the current chat. Run it again to disable the feature. |
+
+The `.help` output is generated from the `COMMAND_HELP` registry in `main.py`. When adding or changing a command, update that registry in the same change so the in-app help stays current.
 
 ### AI and Intelligence
 

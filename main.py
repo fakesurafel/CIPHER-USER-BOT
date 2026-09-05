@@ -61,6 +61,57 @@ ORIGINAL_PROFILE = {}
 IS_AFK = False
 AFK_REASON = ""
 
+# Keep this registry in sync whenever a command is added or its usage changes.
+# The .help command renders this list automatically, so users always get the
+# same command reference that is maintained by the bot.
+COMMAND_HELP = {
+    "AI & translation": [
+        (".help", ".help", "Show all commands and usage."),
+        (".ai", ".ai [question]", "Ask Gemini; reply to an image for analysis."),
+        (".img", ".img [prompt]", "Generate an AI image."),
+        (".tr", ".tr (reply)", "Translate a reply into English."),
+        (".translate", ".translate [language] (reply)", "Translate while preserving slang and tone."),
+    ],
+    "Sniper & hunter": [
+        (".monitor", ".monitor", "Lock the current channel as the target."),
+        (".hunt", ".hunt (reply)", "Lock onto the replied sender."),
+        (".win", ".win [text]", "Arm automatic flash reply mode."),
+        (".quiz", ".quiz", "Arm AI quiz-answer mode."),
+        (".stop", ".stop", "Disable sniper and hunter modes."),
+    ],
+    "Media & utilities": [
+        (".song", ".song [name]", "Download a song."),
+        (".vpic", ".vpic (reply to video)", "Set a video profile photo."),
+        (".web", ".web [URL]", "Capture a web page screenshot."),
+        (".qrl", ".qrl [text or link]", "Generate a QR code."),
+        (".say", ".say [text]", "Generate a voice note."),
+        (".hack", ".hack", "Show a fictional terminal animation."),
+    ],
+    "Profile & status": [
+        (".info", ".info (reply)", "Show user information."),
+        (".clone", ".clone (reply)", "Copy a user's profile identity."),
+        (".revert", ".revert", "Restore the saved profile identity."),
+        (".afk", ".afk [reason]", "Enable AFK auto-replies."),
+        (".autochat", ".autochat", "Toggle AI auto-chat for this chat."),
+    ],
+    "Administration & privacy": [
+        (".purge", ".purge (reply)", "Delete messages from the replied message onward."),
+        (".all", ".all [message]", "Mention non-bot group members."),
+        (".scrape", ".scrape [channel or group]", "Find active members and attempt invites."),
+        (".sunblock", ".sunblock [username, phone, ID]", "Locally filter a private user."),
+        (".sunblockoff", ".sunblockoff [username, phone, ID]", "Remove a local silent block."),
+        (".sblocks", ".sblocks", "List local silent blocks."),
+    ],
+}
+
+def render_help():
+    lines = ["📚 **Sura Bot Commands**", "", "Reply to a message where `(reply)` is shown."]
+    for category, commands in COMMAND_HELP.items():
+        lines.extend(["", f"**{category}**"])
+        for _, usage, description in commands:
+            lines.append(f"`{usage}` — {description}")
+    return "\n".join(lines)
+
 # --- SILENT BLOCK VARIABLES ---
 # This is intentionally separate from Telegram's official block list. It filters
 # messages locally without sending a block action to the other account.
@@ -126,6 +177,10 @@ async def human_edit(event, text, **kwargs):
 # ---------------------------------------------------------
 # 2. GIVEAWAY SNIPER COMMANDS
 # ---------------------------------------------------------
+
+@client.on(events.NewMessage(outgoing=True, pattern=r"^\.help$"))
+async def show_help(event):
+    await human_edit(event, render_help())
 
 @client.on(events.NewMessage(outgoing=True, pattern=r"^\.monitor"))
 async def set_monitor(event):
