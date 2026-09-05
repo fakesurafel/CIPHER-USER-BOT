@@ -40,6 +40,11 @@
 *   `.purge` - Reply to a message to delete it and all subsequent messages.
 *   `.scrape [channel]` - Scrapes active members from a target group and invites them to your current group (Limit: 40 per run).
 *   `.all [message]` - Tags all members in a group using hidden mentions.
+*   `.sunblock [@username|phone|user ID]` - Locally filters a private user's messages without sending Telegram's official block action. It can also be used as a reply to the user's message.
+*   `.sunblockoff [@username|phone|user ID]` - Removes a user from the local silent-block list.
+*   `.sblocks` - Lists locally filtered user IDs in Saved Messages.
+
+Silent blocking is local filtering, not a server-side Telegram block. Incoming messages are ignored and deletion is attempted when permitted, but Telegram cannot guarantee that the sender sees no delivery indicator. The list is persisted in `silent_blocks.json`.
 
 ---
 

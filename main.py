@@ -3,6 +3,7 @@ import asyncio
 import logging
 import io
 import random
+import json
 import yt_dlp
 import edge_tts
 from telethon import TelegramClient, events, functions, types
@@ -59,6 +60,48 @@ ORIGINAL_PROFILE = {}
 # --- AFK VARIABLES ---
 IS_AFK = False
 AFK_REASON = ""
+
+# --- SILENT BLOCK VARIABLES ---
+# This is intentionally separate from Telegram's official block list. It filters
+# messages locally without sending a block action to the other account.
+SILENT_BLOCK_FILE = "silent_blocks.json"
+SILENT_BLOCKED_USERS = set()
+
+def load_silent_blocks():
+    global SILENT_BLOCKED_USERS
+    try:
+        with open(SILENT_BLOCK_FILE, "r", encoding="utf-8") as f:
+            SILENT_BLOCKED_USERS = {int(user_id) for user_id in json.load(f)}
+    except (FileNotFoundError, ValueError, TypeError):
+        SILENT_BLOCKED_USERS = set()
+
+def save_silent_blocks():
+    with open(SILENT_BLOCK_FILE, "w", encoding="utf-8") as f:
+        json.dump(sorted(SILENT_BLOCKED_USERS), f)
+
+async def resolve_user_reference(event, reference):
+    """Resolve a reply, username, phone number, or numeric Telegram ID."""
+    reply = await event.get_reply_message()
+    if reply and not reference:
+        return reply.sender_id
+
+    if not reference:
+        return None
+
+    reference = reference.strip()
+    if reference.startswith("tg://user?id="):
+        reference = reference.split("=", 1)[1]
+
+    try:
+        if reference.startswith("+"):
+            entity = await client.get_entity(reference)
+        elif reference.isdigit():
+            entity = await client.get_entity(int(reference))
+        else:
+            entity = await client.get_entity(reference)
+        return getattr(entity, "id", None)
+    except Exception:
+        return None
 
 # --- SNIPER VARIABLES ---
 TARGET_CHANNEL_ID = None
@@ -154,6 +197,51 @@ async def stop_sniper(event):
     HUNTER_TARGET_ID = None 
     await event.delete()
     await human_send("me", "🛑 **Sniper & Hunter Disengaged.**\nAll targets cleared.")
+
+# ---------------------------------------------------------
+# 2B. SILENT LOCAL BLOCK COMMANDS
+# ---------------------------------------------------------
+
+@client.on(events.NewMessage(outgoing=True, pattern=r"^\.sunblock(?:\s+(.+))?$"))
+async def silent_block(event):
+    """Silently filter a private user's incoming messages locally.
+
+    Usage: .sunblock @username, .sunblock +123..., .sunblock user_id,
+    or reply to a user's message with .sunblock.
+    """
+    reference = event.pattern_match.group(1)
+    target_id = await resolve_user_reference(event, reference)
+    if not target_id:
+        return await human_edit(event, "❌ Reply to a user or provide a username/phone/ID.")
+
+    SILENT_BLOCKED_USERS.add(int(target_id))
+    save_silent_blocks()
+    await event.delete()
+    await human_send("me", f"🛡️ **Silent block enabled.**\nUser ID: `{target_id}`\n\nNo official Telegram block action was sent.")
+
+@client.on(events.NewMessage(outgoing=True, pattern=r"^\.sunblockoff(?:\s+(.+))?$"))
+async def silent_unblock(event):
+    """Remove a user from the local silent block list."""
+    reference = event.pattern_match.group(1)
+    target_id = await resolve_user_reference(event, reference)
+    if not target_id:
+        return await human_edit(event, "❌ Reply to a user or provide a username/phone/ID.")
+    if int(target_id) not in SILENT_BLOCKED_USERS:
+        return await human_edit(event, "ℹ️ That user is not silently blocked.")
+
+    SILENT_BLOCKED_USERS.remove(int(target_id))
+    save_silent_blocks()
+    await event.delete()
+    await human_send("me", f"✅ **Silent block disabled.**\nUser ID: `{target_id}`")
+
+@client.on(events.NewMessage(outgoing=True, pattern=r"^\.sblocks$"))
+async def list_silent_blocks(event):
+    """Show locally filtered user IDs in Saved Messages."""
+    await event.delete()
+    if not SILENT_BLOCKED_USERS:
+        return await human_send("me", "🛡️ **Silent block list is empty.**")
+    users = "\n".join(f"• `{user_id}`" for user_id in sorted(SILENT_BLOCKED_USERS))
+    await human_send("me", f"🛡️ **Silent block list:**\n{users}")
 
 # ---------------------------------------------------------
 # 3. GOD MODE COMMANDS
@@ -496,6 +584,16 @@ async def unset_afk_check(event):
 async def incoming_handler(event):
     global MY_ID, SNIPER_MODE, IS_AFK, AFK_REASON, HUNTER_TARGET_ID, AUTO_CHAT_CHATS
 
+    # --- SILENT LOCAL BLOCK ---
+    # Do not forward, auto-reply to, or otherwise process blocked private chats.
+    # Deleting is attempted only when Telegram permits the account to delete it.
+    if event.is_private and event.sender_id in SILENT_BLOCKED_USERS:
+        try:
+            await event.delete()
+        except Exception as e:
+            logger.debug(f"Silent block deletion unavailable for {event.sender_id}: {e}")
+        return
+
     # --- AI AUTO-CHAT LOGIC ---
     # Trigger ONLY if chat_id is in AUTO_CHAT_CHATS AND it's NOT a message from ME
     if event.chat_id in AUTO_CHAT_CHATS and not event.out:
@@ -638,6 +736,8 @@ async def download(r):
 async def main():
     global MY_ID
     logger.info("⏳ Starting...")
+    load_silent_blocks()
+    logger.info(f"🛡️ Loaded {len(SILENT_BLOCKED_USERS)} silent block(s)")
     await client.start()
 
     me = await client.get_me()
