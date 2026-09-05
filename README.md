@@ -24,6 +24,7 @@ Commands are recognized when sent from your own account and begin with a period 
 | `.ai` with an image | Reply to an image with `.ai [question]` | Asks Gemini to analyze the replied image. If no question is supplied, the bot requests a description. |
 | `.img` | `.img [prompt]` | Generates an image from the prompt using the configured image service and sends it to the current chat. |
 | `.tr` | Reply to a text message with `.tr` | Translates the replied message into English. |
+| `.translate` | Reply to a text message with `.translate [language]` | Translates into the selected language while preserving slang, emotion, humor, sarcasm, abbreviations, profanity level, punctuation, emojis, and overall conversational vibe. Use a language name or supported language code. |
 | `.quiz` | `.quiz` | Arms AI quiz mode for the monitored target. The bot attempts to answer the next matching question. Requires `GEMINI_KEY`. |
 
 ### Giveaway Sniper and Hunter Protocol
@@ -62,7 +63,11 @@ Examples:
 .web https://example.com
 .qrl https://t.me/example
 .say Hello, how are you?
+.translate Spanish
+.translate am
 ```
+
+For `.translate`, reply to the message first, then send the command. Examples include `.translate Spanish`, `.translate French`, `.translate Amharic`, or `.translate es`. When `GEMINI_KEY` is configured, the command uses Gemini with explicit tone-preservation instructions; without it, it falls back to the translation library.
 
 ### Profile and Identity Commands
 

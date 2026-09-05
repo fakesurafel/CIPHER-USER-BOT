@@ -481,7 +481,7 @@ async def set_video_profile(event):
     except Exception as e:
         await human_edit(event, f"❌ Error: {e}")
 
-@client.on(events.NewMessage(outgoing=True, pattern=r"^\.tr"))
+@client.on(events.NewMessage(outgoing=True, pattern=r"^\.tr$"))
 async def translate_msg(event):
     reply = await event.get_reply_message()
     if not reply or not reply.text:
@@ -490,6 +490,37 @@ async def translate_msg(event):
     try:
         translated = GoogleTranslator(source='auto', target='en').translate(reply.text)
         await human_edit(event, f"🌐 **Translated (EN):**\n\n{translated}")
+    except Exception as e:
+        await human_edit(event, f"❌ Translation Error: {e}")
+
+@client.on(events.NewMessage(outgoing=True, pattern=r"^\.translate\s+(.+)$"))
+async def translate_to_language(event):
+    """Translate while preserving the source message's tone and intent."""
+    language = event.pattern_match.group(1).strip()
+    reply = await event.get_reply_message()
+    if not reply or not reply.text:
+        return await human_edit(event, "❌ Reply to a text message and specify a language.\nExample: `.translate Spanish`")
+
+    await human_edit(event, f"🌐 **Translating to {language}...**")
+    try:
+        if gemini_key:
+            prompt = (
+                f"Translate the text below into {language}. Preserve the meaning and every part of its tone: "
+                "slang, dialect, casual or formal register, humor, sarcasm, emotion, abbreviations, typos, "
+                "profanity level, punctuation, emojis, line breaks, and intensity. Do not sanitize, formalize, "
+                "summarize, explain, or add notes. Use natural expressions that a native speaker of the target "
+                "language would actually use in the same social situation. Keep names, links, usernames, numbers, "
+                "and code unchanged. Return only the translation.\n\n"
+                f"SOURCE TEXT:\n{reply.text}"
+            )
+            response = await asyncio.to_thread(model.generate_content, prompt)
+            translated = response.text.strip()
+        else:
+            translated = GoogleTranslator(source='auto', target=language).translate(reply.text)
+
+        if len(translated) > 4000:
+            translated = translated[:4000] + "..."
+        await human_edit(event, f"🌐 **{language}:**\n\n{translated}")
     except Exception as e:
         await human_edit(event, f"❌ Translation Error: {e}")
 
